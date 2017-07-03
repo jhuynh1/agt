@@ -15,7 +15,10 @@ import java.util.stream.IntStream;
  */
 public class ClientRegisterInterest {
 
-  private static boolean batchOps = true;
+  private static boolean batchOps = false;
+  private static final int batchSize = 1000;
+  private static int timesToRunTest = 10000;
+  private static long totalDiffTime = 0L;
 
   public static void main(String[] args) throws Exception {
     GemFireTest test = new GemFireTest();
@@ -26,15 +29,17 @@ public class ClientRegisterInterest {
     Region region = test.createClientRegion("region", ClientRegionShortcut.PROXY, listener);
     region.registerInterestRegex(".*");
 
-    IntStream.range(0,1000).forEach(i -> {
-      final int batchSize = 100;
-      doTest(test, region, listener, i * batchSize, i * batchSize + batchSize);
+    totalDiffTime = 0L;
+    IntStream.range(0,timesToRunTest).forEach(i -> {
+      totalDiffTime += doTest(test, region, listener, i * batchSize, i * batchSize + batchSize);
     });
+
+    System.out.println("Average between all runs:" + totalDiffTime / (timesToRunTest * batchSize));
     InputStreamReader isr = new InputStreamReader(System.in);
     isr.read();
   }
 
-  private static void doTest(GemFireTest test, Region region, PutTimeListener listener, int startIndex, int endIndex) {
+  private static long doTest(GemFireTest test, Region region, PutTimeListener listener, int startIndex, int endIndex) {
     listener.reset();
     if (!batchOps) {
       test.doClientPuts(startIndex, endIndex, (i) -> region.put(i, System.nanoTime()));
@@ -46,9 +51,15 @@ public class ClientRegisterInterest {
       }
       region.putAll(map);
     }
-    while (listener.numOps < endIndex - startIndex) {
-    }
+//    while (listener.numOps < endIndex - startIndex) {
+//      try {
+//        Thread.sleep(15000);
+//      } catch (InterruptedException e) {
+//        e.printStackTrace();
+//      }
+//    }
     System.out.println("AVG DIFF:" + listener.getAverageDelta());
+    return listener.getTotalDiff();
   }
 
   private static class PutTimeListener implements CacheListener {
