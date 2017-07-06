@@ -15,26 +15,28 @@ import java.util.stream.IntStream;
  */
 public class ClientRegisterInterest {
 
-  private static boolean batchOps = false;
+  private static boolean batchOps = true;
   private static final int batchSize = 1000;
-  private static int timesToRunTest = 10000;
+  private static int timesToRunTest = 1000;
   private static long totalDiffTime = 0L;
 
   public static void main(String[] args) throws Exception {
     GemFireTest test = new GemFireTest();
     test.createClientCache();
 
-    PutTimeListener listener = new PutTimeListener();
+    PutTimeListener listener = new PutTimeListener(500000);
 
     Region region = test.createClientRegion("region", ClientRegionShortcut.PROXY, listener);
+    long startRegexTime = System.nanoTime();
     region.registerInterestRegex(".*");
+    System.out.println("Registered interest in " + (System.nanoTime() - startRegexTime));
+    while (listener.numOps < 1500000) {
+      Thread.sleep(15000);
+      System.out.println("current ops count" + listener.numOps);
+    }
 
-    totalDiffTime = 0L;
-    IntStream.range(0,timesToRunTest).forEach(i -> {
-      totalDiffTime += doTest(test, region, listener, i * batchSize, i * batchSize + batchSize);
-    });
-
-    System.out.println("Average between all runs:" + totalDiffTime / (timesToRunTest * batchSize));
+//    System.out.println("Average between all runs:" + totalDiffTime / (timesToRunTest * batchSize));
+    System.out.println("Average across all runs:" + listener.getAverageDelta());
     InputStreamReader isr = new InputStreamReader(System.in);
     isr.read();
   }
@@ -47,7 +49,7 @@ public class ClientRegisterInterest {
     else {
       HashMap map = new HashMap();
       for (int i = startIndex; i < endIndex; i++) {
-        map.put(i, System.nanoTime());
+        map.put(i, new Object[]{System.nanoTime(), new long[64]});
       }
       region.putAll(map);
     }
@@ -62,17 +64,31 @@ public class ClientRegisterInterest {
     return listener.getTotalDiff();
   }
 
+  private static void warmup(GemFireTest test, Region region, PutTimeListener listener) {
+    IntStream.range(0,100).forEach(i -> {
+      totalDiffTime += doTest(test, region, listener, i * batchSize, i * batchSize + batchSize);
+    });
+
+    IntStream.range(0,100 * batchSize).forEach(i -> {region.destroy(i);
+    });
+  }
+
+
+
   private static class PutTimeListener implements CacheListener {
     private long totalDiff = 0;
     private long numOps = 0;
+    private final long warmup;
+    private long warmupIters = 0;
 
-
-    public PutTimeListener() {
+    public PutTimeListener(long warmup) {
+      this.warmup = warmup;
     }
 
     public void reset() {
       totalDiff = 0;
       numOps = 0;
+      warmupIters = 0;
     }
     public long getTotalDiff() {
       return totalDiff;
@@ -84,16 +100,20 @@ public class ClientRegisterInterest {
 
       @Override
       public void afterCreate(final EntryEvent entryEvent) {
-       // System.out.println("after create:" + entryEvent);
-        long putTime = (Long) entryEvent.getNewValue();
-        long currentTime = System.nanoTime();
-        totalDiff += (currentTime - putTime);
-        numOps++;
+        if (warmupIters++ < warmup) {
+          return;
+        } else {
+          // System.out.println("after create:" + entryEvent);
+          long putTime = (Long) ((Object[]) entryEvent.getNewValue())[0];
+          long currentTime = System.nanoTime();
+          totalDiff += (currentTime - putTime);
+          numOps++;
+        }
       }
 
       @Override
       public void afterUpdate(final EntryEvent entryEvent) {
-        //System.out.println("after update:" + entryEvent);
+        System.out.println("after update:" + entryEvent);
       }
 
       @Override
