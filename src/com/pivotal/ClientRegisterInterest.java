@@ -40,7 +40,7 @@ public class ClientRegisterInterest {
     private long numOps = 0;
     private final long warmup;
     private long warmupIters = 0;
-    private long WCET = (long) Float.NEGATIVE_INFINITY;
+    private long WCET = 0;
 
     public PutTimeListener(long warmup) {
       this.warmup = warmup;
@@ -63,7 +63,7 @@ public class ClientRegisterInterest {
         long currentTime = System.nanoTime();
         long commTime = currentTime - putTime;
 
-        if (WCET < commTime)
+        if (commTime > WCET)
           WCET = commTime;
 
         totalDiff += commTime;

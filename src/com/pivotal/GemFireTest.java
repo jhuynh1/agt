@@ -3,6 +3,7 @@ package com.pivotal;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Properties;
 
 import org.apache.geode.cache.CacheListener;
 import org.apache.geode.cache.Region;
@@ -17,7 +18,7 @@ public class GemFireTest {
 
   private ClientCache cache;
 
-  private static String GFSH_LOCATION = "/Users/danuta/Documents/workspace/geode/geode-assembly/build/install/apache-geode/bin/";
+  private static String GFSH_LOCATION = "/Users/danuta/Documents/workspace/gemfire/open/geode-assembly/build/install/apache-geode/bin/";
 
   public GemFireTest() {}
 
@@ -25,16 +26,17 @@ public class GemFireTest {
     ClientCacheFactory ccf = new ClientCacheFactory();
     ccf.addPoolLocator("localhost", 10333);
     ccf.setPoolSubscriptionEnabled(true);
-    ccf.setPoolSubscriptionAckInterval(10);
+//    ccf.setPoolSubscriptionAckInterval(10);
+    System.setProperty("gemfire.statistic-archive-file", "client_stats.gfs");
     cache = ccf.create();
   }
 
   protected Region createClientRegion(String regionName, ClientRegionShortcut regionShortcut) {
-    return cache.createClientRegionFactory(regionShortcut).create(regionName);
+    return cache.createClientRegionFactory(regionShortcut).setStatisticsEnabled(true).create(regionName);
   }
 
   protected Region createClientRegion(String regionName, ClientRegionShortcut regionShortcut, CacheListener listener) {
-    return cache.createClientRegionFactory(regionShortcut).addCacheListener(listener).create(regionName);
+    return cache.createClientRegionFactory(regionShortcut).setStatisticsEnabled(true).addCacheListener(listener).create(regionName);
   }
 
   protected  void startLocator() throws Exception {
