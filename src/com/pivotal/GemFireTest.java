@@ -1,16 +1,15 @@
 package com.pivotal;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.Properties;
+
 import org.apache.geode.cache.CacheListener;
 import org.apache.geode.cache.Region;
 import org.apache.geode.cache.client.ClientCache;
 import org.apache.geode.cache.client.ClientCacheFactory;
 import org.apache.geode.cache.client.ClientRegionShortcut;
-
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.function.IntConsumer;
-import java.util.stream.IntStream;
 
 /**
  * Created by jhuynh on 6/29/17.
@@ -19,63 +18,33 @@ public class GemFireTest {
 
   private ClientCache cache;
 
-  private static String GFSH_LOCATION = "/Users/jhuynh/Pivotal/gemfire/gemfire/open/geode-assembly/build/install/apache-geode/bin/";
+  private static String GFSH_LOCATION = "/Users/danuta/Documents/workspace/gemfire/open/geode-assembly/build/install/apache-geode/bin/";
 
-
-  public GemFireTest() {
-
-  }
-
-//  public static void main(String[] args) throws Exception {
-//    GemFireTest test = new GemFireTest();
-//    test.startLocator();
-//    test.createClientCache();
-//    Region region = test.createClientRegion("region", ClientRegionShortcut.CACHING_PROXY);
-//    test.registerInterest(region);
-//    test.doClientPuts((i)-> region.put(i, ""));
-//    test.stopServer();
-//  }
+  public GemFireTest() {}
 
   protected void createClientCache() {
     ClientCacheFactory ccf = new ClientCacheFactory();
     ccf.addPoolLocator("localhost", 10333);
     ccf.setPoolSubscriptionEnabled(true);
+//    ccf.setPoolSubscriptionAckInterval(10);
+    System.setProperty("gemfire.statistic-archive-file", "client_stats.gfs");
     cache = ccf.create();
   }
 
   protected Region createClientRegion(String regionName, ClientRegionShortcut regionShortcut) {
-    return cache.createClientRegionFactory(regionShortcut).create(regionName);
+    return cache.createClientRegionFactory(regionShortcut).setStatisticsEnabled(true).create(regionName);
   }
 
   protected Region createClientRegion(String regionName, ClientRegionShortcut regionShortcut, CacheListener listener) {
-    return cache.createClientRegionFactory(regionShortcut).addCacheListener(listener).create(regionName);
-  }
-
-  protected void registerInterest(Region region) {
-    region.registerInterest(".*");
-  }
-
-  protected void doClientPuts(int startIndex, int endIndex, IntConsumer action) {
-    IntStream.range(startIndex, endIndex).forEach(i -> action.accept(i));
+    return cache.createClientRegionFactory(regionShortcut).setStatisticsEnabled(true).addCacheListener(listener).create(regionName);
   }
 
   protected  void startLocator() throws Exception {
-//    ServerLauncher serverLauncher  = new ServerLauncher.Builder()
-//        .setMemberName("server1")
-//        .setServerPort(40405)
-//        .set("jmx-manager", "true")
-//        .set("jmx-manager-start", "true")
-//        .build();
-//
-//    ServerLauncher.ServerState start = serverLauncher.start();
-//    cache = new CacheFactory().create();
     executeCommand(GFSH_LOCATION+ "gfsh start locator --name=locator --port=10333");
-
   }
 
   protected void startServer(String serverName, int serverPort) throws Exception {
-    executeCommand(GFSH_LOCATION + "gfsh start server --name=" + serverName + " --locators=localhost[10333] --server-port=" + serverPort + " --cache-xml-file=./resources/cache.xml");
-
+    executeCommand(GFSH_LOCATION + "gfsh start server --name=" + serverName + " --locators=localhost[10333] --server-port=" + serverPort + " --cache-xml-file=./resources/cache.xml --statistic-archive-file=stats.gfs");
   }
 
   protected void stopServer(String dir) throws Exception {
@@ -98,6 +67,4 @@ public class GemFireTest {
       line =  bis.readLine();
     }
   }
-
-
 }
